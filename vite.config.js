@@ -29,13 +29,5 @@ export default defineConfig({
         ]
       }
     })
-  ],
-  resolve: {
-    alias: {
-      'firebase/app': path.resolve(__dirname, './src/mockFirebase.js'),
-      'firebase/auth': path.resolve(__dirname, './src/mockFirebase.js'),
-      'firebase/firestore': path.resolve(__dirname, './src/mockFirebase.js'),
-      'firebase/storage': path.resolve(__dirname, './src/mockFirebase.js')
-    }
-  }
+  ]
 })
