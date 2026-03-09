@@ -16,15 +16,12 @@ export default function Navbar() {
   }
 
   return (
-    <nav style={{ 
-      padding: 'var(--spacing-6) var(--spacing-4)',
-      position: 'sticky',
-      top: 0,
-      zIndex: 100,
-      background: 'transparent'
-    }}>
-      <div className="container flex items-center justify-between" style={{ padding: 0 }}>
-        
+    <nav className="navbar" style={{ position: 'sticky', top: 0, zIndex: 100, backgroundColor: 'rgba(10, 10, 10, 0.8)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+      <div className="container flex justify-between items-center" style={{ height: '70px' }}>
+        <Link to="/" className="flex items-center gap-2" style={{ textDecoration: 'none' }}>
+           <img src="/logo.png" alt="ShareBite Logo" style={{ height: '40px', objectFit: 'contain' }} />
+        </Link>
+        <div className="flex items-center gap-4">
         {currentUser && userProfile ? (
           <>
             <div style={{ 
@@ -58,18 +55,10 @@ export default function Navbar() {
         ) : (
           <>
             <div style={{ visibility: 'hidden', width: '40px' }} />
-            <Link to="/login" style={{ 
-                width: '40px', height: '40px', 
-                borderRadius: '50%', background: 'var(--surface-glass)', 
-                border: '1px solid var(--border-glass)', 
-                boxShadow: 'var(--primary-glow)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none',
-                backdropFilter: 'blur(10px)'
-            }}>
-              <Activity size={18} color="var(--primary-color)" />
-            </Link>
+            <Link to="/login" className="btn btn-primary" style={{ padding: '8px 20px', borderRadius: '50px', fontSize: '0.875rem' }}>Login</Link>
           </>
         )}
+        </div>
       </div>
     </nav>
   );

@@ -34,19 +34,14 @@ export default function Login() {
     <div className="container flex items-center justify-center p-4" style={{ minHeight: '80vh', flexDirection: 'column' }}>
       
       <div style={{
-          width: '100px',
-          height: '100px',
-          borderRadius: '50%',
-          background: 'rgba(34, 197, 94, 0.1)',
-          border: '1px solid rgba(74, 222, 128, 0.3)',
-          boxShadow: '0 0 40px rgba(74, 222, 128, 0.4), inset 0 0 20px rgba(74, 222, 128, 0.2)',
+          width: '120px',
+          height: '120px',
+          marginBottom: '40px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: '60px',
-          backdropFilter: 'blur(10px)'
+          justifyContent: 'center'
       }}>
-        <Activity size={50} color="var(--primary-color)" />
+        <img src="/logo.png" alt="ShareBite Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 0 20px rgba(34, 197, 94, 0.4))' }} />
       </div>
       
       <div style={{ width: '100%', maxWidth: '320px', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)' }}>

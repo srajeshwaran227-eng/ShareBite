@@ -6,7 +6,13 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 // Note: Requires leaflet CSS in index.html or imported
 export default function NearbyNGOsMap({ userLocation }) {
   const [ngos, setNgos] = useState([]);
-  const defaultCenter = [40.7128, -74.0060]; // fallback NYC
+  const defaultCenter = [20.5937, 78.9629]; // fallback India Center (Nagpur area)
+  
+  // Create a bounding box for India roughly [SouthWest, NorthEast]
+  const indiaBounds = [
+    [6.4626999, 68.1097], // Southwest coordinates
+    [35.513327, 97.3953586] // Northeast coordinates
+  ];
 
   useEffect(() => {
     async function fetchNgos() {
@@ -28,7 +34,10 @@ export default function NearbyNGOsMap({ userLocation }) {
     <div className="card" style={{ height: '400px', overflow: 'hidden' }}>
       <MapContainer 
         center={center} 
-        zoom={userLocation ? 12 : 2} 
+        zoom={userLocation ? 12 : 5} 
+        maxBounds={indiaBounds}
+        maxBoundsViscosity={1.0}
+        minZoom={4}
         style={{ height: '100%', width: '100%', zIndex: 1 }}
       >
         <TileLayer

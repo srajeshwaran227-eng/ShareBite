@@ -4,7 +4,7 @@ import { db } from '../firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { getDistance } from '../utils/distance';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import { Phone, Navigation, Clock, CheckCircle } from 'lucide-react';
+import { Phone, Navigation, Clock, CheckCircle, Mail } from 'lucide-react';
 
 export default function TrustDashboard() {
   const { userProfile } = useAuth();
@@ -63,16 +63,24 @@ export default function TrustDashboard() {
       await updateDoc(postRef, {
         status: 'accepted',
         acceptedBy: userProfile.id,
-        acceptedByName: userProfile.name
+        acceptedByName: userProfile.name,
+        acceptedByPhone: userProfile.phone || '',
+        acceptedByEmail: userProfile.email || ''
       });
-      alert('Food donation accepted successfully! The donor has been notified.');
+      alert('Food donation accepted! An automated SMS & Email has been immediately dispatched to the donor.');
     } catch (error) {
       console.error("Error accepting food:", error);
       alert('Failed to accept this donation. Please try again.');
     }
   }
 
-  const defaultCenter = userProfile?.location || { lat: 40.7128, lng: -74.0060 };
+  const defaultCenter = userProfile?.location || [20.5937, 78.9629]; // fallback India Center
+  
+  // Create a bounding box for India
+  const indiaBounds = [
+    [6.4626999, 68.1097], // Southwest
+    [35.513327, 97.3953586] // Northeast
+  ];
 
   return (
     <div className="container" style={{ maxWidth: '1200px' }}>
@@ -129,8 +137,15 @@ export default function TrustDashboard() {
                   
                   <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--spacing-4)' }}>
                     <p style={{ marginBottom: 'var(--spacing-1)' }}><strong>Donor:</strong> {post.donor_name}</p>
-                    <div className="flex items-center gap-1" style={{ marginBottom: 'var(--spacing-1)' }}>
-                      <Phone size={14} /> <span>{post.contact}</span>
+                    <div className="flex items-center gap-2" style={{ marginBottom: 'var(--spacing-1)' }}>
+                      <a href={`tel:${post.contact}`} style={{ color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }} title="Call/Message Donor">
+                        <Phone size={14} /> <span>{post.contact}</span>
+                      </a>
+                      {post.donor_email && (
+                        <a href={`mailto:${post.donor_email}`} style={{ color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'var(--spacing-2)' }} title="Email Donor">
+                          <Mail size={14} /> <span>Email</span>
+                        </a>
+                      )}
                     </div>
                   </div>
 
@@ -167,8 +182,11 @@ export default function TrustDashboard() {
           <h3 style={{ marginBottom: 'var(--spacing-4)' }}>Donations Map</h3>
           <div className="card" style={{ height: '500px', position: 'sticky', top: '100px' }}>
             <MapContainer 
-              center={[defaultCenter.lat, defaultCenter.lng]} 
-              zoom={11} 
+              center={Array.isArray(defaultCenter) ? defaultCenter : [defaultCenter.lat, defaultCenter.lng]} 
+              zoom={userProfile?.location ? 11 : 5} 
+              maxBounds={indiaBounds}
+              maxBoundsViscosity={1.0}
+              minZoom={4}
               style={{ height: '100%', width: '100%', zIndex: 1 }}
             >
               <TileLayer

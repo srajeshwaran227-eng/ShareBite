@@ -4,7 +4,7 @@ import { db } from '../firebase';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import FoodUploadForm from '../components/FoodUploadForm';
 import NearbyNGOsMap from '../components/NearbyNGOsMap';
-import { Clock, CheckCircle } from 'lucide-react';
+import { Clock, CheckCircle, Phone, Mail } from 'lucide-react';
 
 export default function DonorDashboard() {
   const { userProfile } = useAuth();
@@ -99,7 +99,24 @@ export default function DonorDashboard() {
                           ) : post.status === 'available' ? (
                             <><Clock size={14} /> <span>Available</span></>
                           ) : (
-                            <><CheckCircle size={14} /> <span>Accepted</span></>
+                            <div className="flex-col gap-2" style={{ width: '100%' }}>
+                              <div className="flex items-center gap-1">
+                                <CheckCircle size={14} /> 
+                                <span>Accepted by {post.acceptedByName}</span>
+                              </div>
+                              <div className="flex gap-2" style={{ marginTop: 'var(--spacing-2)' }}>
+                                {post.acceptedByPhone && (
+                                  <a href={`tel:${post.acceptedByPhone}`} className="btn btn-outline" style={{ padding: '4px 8px', fontSize: '0.75rem', gap: '4px' }}>
+                                    <Phone size={12} /> Call/SMS
+                                  </a>
+                                )}
+                                {post.acceptedByEmail && (
+                                  <a href={`mailto:${post.acceptedByEmail}`} className="btn btn-outline" style={{ padding: '4px 8px', fontSize: '0.75rem', gap: '4px' }}>
+                                    <Mail size={12} /> Email
+                                  </a>
+                                )}
+                              </div>
+                            </div>
                           )}
                         </div>
                       </div>

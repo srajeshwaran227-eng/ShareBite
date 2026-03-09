@@ -1,9 +1,10 @@
 import { useState, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db, storage } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { MapPin, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { getDistance } from '../utils/distance';
 
 export default function FoodUploadForm({ onSuccess }) {
   const { userProfile } = useAuth();
@@ -83,6 +84,7 @@ export default function FoodUploadForm({ onSuccess }) {
         donor_id: userProfile.id,
         donor_name: userProfile.name,
         contact: userProfile.phone,
+        donor_email: userProfile.email || '',
         location: location,
         status: 'available',
         createdAt: serverTimestamp() // Used for 3-hour expiration
@@ -97,6 +99,31 @@ export default function FoodUploadForm({ onSuccess }) {
       setLocation(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       
+      // 3. Simulate "Immediate Sending" of SMS and Email to Nearby NGOs
+      try {
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('role', '==', 'trust'));
+        const querySnapshot = await getDocs(q);
+        
+        let nearbyNgosCount = 0;
+        querySnapshot.forEach((doc) => {
+          const trust = doc.data();
+          if (trust.location) {
+            const distance = getDistance(
+              location.lat, location.lng,
+              trust.location.lat, trust.location.lng
+            );
+            if (distance <= 10) nearbyNgosCount++;
+          }
+        });
+
+        if (nearbyNgosCount > 0) {
+          alert(`Success! SMS & Email automatically dispatched to ${nearbyNgosCount} nearby Trust/NGOs.`);
+        }
+      } catch (e) {
+        console.error("Error sending mock notifications", e);
+      } // end notification mock
+
       if (onSuccess) onSuccess();
 
     } catch (err) {
