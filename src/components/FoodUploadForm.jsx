@@ -3,241 +3,183 @@ import { useAuth } from '../contexts/AuthContext';
 import { db, storage } from '../firebase';
 import { collection, addDoc, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { MapPin, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { MapPin, Loader2, Camera } from 'lucide-react';
 import { getDistance } from '../utils/distance';
 
 export default function FoodUploadForm({ onSuccess }) {
   const { userProfile } = useAuth();
   const fileInputRef = useRef(null);
-  
-  const [formData, setFormData] = useState({
-    foodName: '',
-    quantity: '',
-  });
-  
-  const [imageFile, setImageFile] = useState(null);
+
+  const [foodName, setFoodName]       = useState('');
+  const [quantity, setQuantity]       = useState('');
+  const [foodType, setFoodType]       = useState('veg');
+  const [imageFile, setImageFile]     = useState(null);
   const [imagePreview, setImagePreview] = useState('');
-  const [location, setLocation] = useState(null);
+  const [location, setLocation]       = useState(null);
   const [locationError, setLocationError] = useState('');
-  const [isLocating, setIsLocating] = useState(false);
+  const [isLocating, setIsLocating]   = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError]             = useState('');
 
   function handleImageChange(e) {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setImageFile(file);
-      setImagePreview(URL.createObjectURL(file));
+    if (e.target.files?.[0]) {
+      const f = e.target.files[0];
+      setImageFile(f);
+      setImagePreview(URL.createObjectURL(f));
     }
   }
 
   function getLocation() {
-    setIsLocating(true);
-    setLocationError('');
-    
-    if (!navigator.geolocation) {
-      setLocationError('Geolocation is not supported by your browser');
-      setIsLocating(false);
-      return;
-    }
-
+    setIsLocating(true); setLocationError('');
+    if (!navigator.geolocation) { setLocationError('Geolocation not supported.'); setIsLocating(false); return; }
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLocation({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        });
-        setIsLocating(false);
-      },
-      () => {
-        setLocationError('Unable to retrieve your location. Please allow location access.');
-        setIsLocating(false);
-      }
+      p => { setLocation({ lat: p.coords.latitude, lng: p.coords.longitude }); setIsLocating(false); },
+      () => { setLocationError('Allow location access and try again.'); setIsLocating(false); }
     );
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!location) {
-      setError('Please detect your location first.');
-      return;
-    }
-    if (!imageFile) {
-      setError('Please provide a photo of the food.');
-      return;
-    }
-
+    if (!location)   { setError('Please detect your location first.'); return; }
+    if (!imageFile)  { setError('Please provide a food photo.'); return; }
     try {
-      setIsSubmitting(true);
-      setError('');
-
-      // 1. Upload image to Firebase Storage
+      setIsSubmitting(true); setError('');
       const storageRef = ref(storage, `food_images/${Date.now()}_${imageFile.name}`);
-      const uploadResult = await uploadBytes(storageRef, imageFile);
-      const imageUrl = await getDownloadURL(uploadResult.ref);
+      const uploaded   = await uploadBytes(storageRef, imageFile);
+      const imageUrl   = await getDownloadURL(uploaded.ref);
 
-      // 2. Save data to Firestore
-      const postData = {
-        food_name: formData.foodName,
-        quantity: formData.quantity,
-        image_url: imageUrl,
-        donor_id: userProfile.id,
-        donor_name: userProfile.name,
-        contact: userProfile.phone,
+      await addDoc(collection(db, 'foodPosts'), {
+        food_name:   foodName,
+        quantity,
+        food_type:   foodType,
+        image_url:   imageUrl,
+        donor_id:    userProfile.id,
+        donor_name:  userProfile.name,
+        contact:     userProfile.phone,
         donor_email: userProfile.email || '',
-        location: location,
-        status: 'available',
-        createdAt: serverTimestamp() // Used for 3-hour expiration
-      };
+        location,
+        status:      'available',
+        createdAt:   serverTimestamp(),
+      });
 
-      await addDoc(collection(db, 'foodPosts'), postData);
-      
-      // Reset form on success
-      setFormData({ foodName: '', quantity: '' });
-      setImageFile(null);
-      setImagePreview('');
-      setLocation(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      
-      // 3. Simulate "Immediate Sending" of SMS and Email to Nearby NGOs
+      // Notify nearby trusts
       try {
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('role', '==', 'trust'));
-        const querySnapshot = await getDocs(q);
-        
-        let nearbyNgosCount = 0;
-        querySnapshot.forEach((doc) => {
-          const trust = doc.data();
-          if (trust.location) {
-            const distance = getDistance(
-              location.lat, location.lng,
-              trust.location.lat, trust.location.lng
-            );
-            if (distance <= 10) nearbyNgosCount++;
-          }
+        const snap = await getDocs(query(collection(db, 'users'), where('role', '==', 'trust')));
+        const nearby = snap.docs.filter(d => {
+          const t = d.data();
+          return t.location && getDistance(location.lat, location.lng, t.location.lat, t.location.lng) <= 10;
         });
+        if (nearby.length > 0) alert(`✅ Notified ${nearby.length} nearby NGO(s)!`);
+      } catch (e) { console.error(e); }
 
-        if (nearbyNgosCount > 0) {
-          alert(`Success! SMS & Email automatically dispatched to ${nearbyNgosCount} nearby Trust/NGOs.`);
-        }
-      } catch (e) {
-        console.error("Error sending mock notifications", e);
-      } // end notification mock
-
+      // Reset
+      setFoodName(''); setQuantity(''); setFoodType('veg');
+      setImageFile(null); setImagePreview(''); setLocation(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       if (onSuccess) onSuccess();
-
     } catch (err) {
-      console.error('Error submitting food post: ', err);
-      setError('Failed to upload food post. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
+      console.error(err);
+      setError('Upload failed. Please try again.');
+    } finally { setIsSubmitting(false); }
   }
 
   return (
     <div className="card">
       <div className="card-body">
-        <h3 style={{ marginBottom: 'var(--spacing-4)' }}>Donate Food</h3>
-        
-        {error && (
-          <div style={{ backgroundColor: 'var(--error-color)', color: 'white', padding: 'var(--spacing-2)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--spacing-4)' }}>
-            {error}
-          </div>
-        )}
+        <h3 style={{ marginBottom:'1rem', color:'#2C3E1F' }}>🍱 Post a Food Donation</h3>
+
+        {error && <div style={{ background:'#FEE2E2', color:'#B91C1C', padding:'0.5rem 1rem', borderRadius:'10px', marginBottom:'1rem', fontSize:'0.85rem' }}>{error}</div>}
 
         <form onSubmit={handleSubmit}>
+          {/* Food name */}
           <div className="form-group">
-            <label className="form-label" htmlFor="foodName">Food Name</label>
-            <input 
-              id="foodName"
-              className="form-control"
-              value={formData.foodName}
-              onChange={(e) => setFormData({...formData, foodName: e.target.value})}
-              placeholder="e.g. 5 loaves of bread, Rice and Curry"
-              required
-            />
+            <label className="form-label">Food Name</label>
+            <input className="form-control" placeholder="e.g. Rice and Curry, Bread…" value={foodName}
+              onChange={e => setFoodName(e.target.value)} required />
           </div>
 
+          {/* Quantity */}
           <div className="form-group">
-            <label className="form-label" htmlFor="quantity">Quantity (e.g., kg, pieces, meals)</label>
-            <input 
-              id="quantity"
-              className="form-control"
-              value={formData.quantity}
-              onChange={(e) => setFormData({...formData, quantity: e.target.value})}
-              placeholder="e.g. 2 kg, 10 meals"
-              required
-            />
+            <label className="form-label">Quantity</label>
+            <input className="form-control" placeholder="e.g. 2 kg, 10 meals…" value={quantity}
+              onChange={e => setQuantity(e.target.value)} required />
           </div>
 
+          {/* Veg / Non-veg */}
           <div className="form-group">
-            <label className="form-label">Food Photo</label>
-            <div 
-              style={{ 
-                border: '2px dashed var(--border-color)', 
-                borderRadius: 'var(--radius-md)',
-                padding: 'var(--spacing-4)',
-                textAlign: 'center',
-                cursor: 'pointer',
-                position: 'relative',
-                overflow: 'hidden'
-              }}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <input 
-                type="file"
-                ref={fileInputRef}
-                style={{ display: 'none' }}
-                accept="image/*"
-                onChange={handleImageChange}
-              />
-              
-              {imagePreview ? (
-                <img 
-                  src={imagePreview} 
-                  alt="Preview" 
-                  style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: 'var(--radius-sm)' }} 
-                />
-              ) : (
-                <div className="flex-col items-center justify-center" style={{ color: 'var(--text-secondary)' }}>
-                  <ImageIcon size={32} style={{ marginBottom: 'var(--spacing-2)' }} />
-                  <p>Click to upload a photo</p>
-                </div>
-              )}
+            <label className="form-label">Food Type</label>
+            <div style={{ display:'flex', alignItems:'center', gap:'0.75rem' }}>
+              <span style={{ fontSize:'0.9rem', color:'#5A6B3A' }}>Food Type:</span>
+              <div className="toggle-group">
+                <button type="button" className={`toggle-btn${foodType==='veg' ? ' active-veg' : ''}`}
+                  onClick={() => setFoodType('veg')}>Veg</button>
+                <button type="button" className={`toggle-btn${foodType==='nonveg' ? ' active-nonveg' : ''}`}
+                  onClick={() => setFoodType('nonveg')}>Non-Veg</button>
+              </div>
             </div>
           </div>
 
+          {/* Photo upload */}
           <div className="form-group">
-            <label className="form-label">Location Pickup</label>
+            <label className="form-label">Upload Photo</label>
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                border: '2px dashed #D9D0C0', borderRadius:'14px',
+                padding:'1rem', textAlign:'center', cursor:'pointer',
+                background:'#FAFAF7', position:'relative', overflow:'hidden',
+                minHeight:'100px', display:'flex', alignItems:'center', justifyContent:'center'
+              }}>
+              <input type="file" ref={fileInputRef} style={{ display:'none' }} accept="image/*" onChange={handleImageChange} />
+              {imagePreview
+                ? <img src={imagePreview} alt="preview" style={{ width:'100%', maxHeight:'180px', objectFit:'cover', borderRadius:'10px' }}/>
+                : <div style={{ color:'#9EAD82', display:'flex', flexDirection:'column', alignItems:'center', gap:'8px' }}>
+                    <Camera size={28}/>
+                    <span style={{ fontSize:'0.85rem' }}>Tap to upload photo</span>
+                  </div>
+              }
+            </div>
+          </div>
+
+          {/* Location */}
+          <div className="form-group">
+            <label className="form-label">Pickup Location</label>
             {location ? (
-              <div className="flex items-center gap-2" style={{ color: 'var(--success-color)', fontSize: '0.875rem' }}>
-                <MapPin size={16} />
-                <span>Location detected successfully</span>
+              <div style={{ display:'flex', alignItems:'center', gap:'8px', color:'#3A8C3F', fontSize:'0.9rem', fontWeight:600 }}>
+                <MapPin size={16}/> Location detected ✓
+                <button type="button" onClick={() => setLocation(null)} style={{ marginLeft:'auto', background:'none', border:'none', color:'#9EAD82', cursor:'pointer', fontSize:'0.75rem' }}>Change</button>
               </div>
             ) : (
               <div>
-                <button 
-                  type="button" 
-                  className="btn btn-outline" 
-                  onClick={getLocation}
-                  disabled={isLocating}
-                  style={{ width: '100%', gap: 'var(--spacing-2)' }}
-                >
-                  {isLocating ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
-                  {isLocating ? 'Detecting Location...' : 'Detect My Location'}
+                <button type="button" onClick={getLocation} disabled={isLocating}
+                  style={{
+                    width:'100%', padding:'0.6rem 1rem',
+                    background:'transparent', border:'1.5px solid #E8622A',
+                    borderRadius:'999px', color:'#E8622A', fontWeight:700,
+                    fontFamily:'Nunito,sans-serif', cursor:'pointer',
+                    display:'flex', alignItems:'center', justifyContent:'center', gap:'8px',
+                    fontSize:'0.9rem', transition:'all 0.2s'
+                  }}>
+                  {isLocating ? <Loader2 size={16} style={{ animation:'spin 1s linear infinite' }}/> : <MapPin size={16}/>}
+                  {isLocating ? 'Detecting…' : 'Detect My Location'}
                 </button>
-                {locationError && <p style={{ color: 'var(--error-color)', fontSize: '0.75rem', marginTop: 'var(--spacing-1)' }}>{locationError}</p>}
+                {locationError && <p style={{ color:'#E53935', fontSize:'0.78rem', marginTop:'4px' }}>{locationError}</p>}
               </div>
             )}
           </div>
 
-          <button 
-            type="submit" 
-            className="btn btn-primary" 
-            style={{ width: '100%', marginTop: 'var(--spacing-4)' }}
-            disabled={isSubmitting || !location || !imageFile}
-          >
-            {isSubmitting ? 'Uploading...' : 'Publish Food Donation'}
+          {/* Submit */}
+          <button type="submit" disabled={isSubmitting || !location || !imageFile}
+            style={{
+              width:'100%', padding:'0.8rem',
+              background: (isSubmitting || !location || !imageFile) ? '#D9D0C0' : '#E8622A',
+              color:'#fff', border:'none', borderRadius:'12px',
+              fontWeight:800, fontSize:'1rem', cursor:'pointer',
+              fontFamily:'Nunito,sans-serif', transition:'all 0.2s',
+              marginTop:'0.5rem',
+              boxShadow: (!isSubmitting && location && imageFile) ? '0 4px 14px rgba(232,98,42,0.4)' : 'none',
+            }}>
+            {isSubmitting ? 'Uploading…' : '📤 Post Donation'}
           </button>
         </form>
       </div>

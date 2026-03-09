@@ -4,10 +4,10 @@ import Navbar from './Navbar';
 export default function Layout() {
   return (
     <div className="app-container">
-      <Navbar />
-      <main className="app-main p-4">
+      <main className="app-main">
         <Outlet />
       </main>
+      <Navbar />
     </div>
   );
 }

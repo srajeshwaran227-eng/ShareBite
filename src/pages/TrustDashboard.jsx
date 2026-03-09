@@ -4,223 +4,155 @@ import { db } from '../firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { getDistance } from '../utils/distance';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import { Phone, Navigation, Clock, CheckCircle, Mail } from 'lucide-react';
+import { Phone, Navigation, CheckCircle, Mail, Bell } from 'lucide-react';
+
+const VIEWS = { home: 'home', nearby: 'nearby' };
 
 export default function TrustDashboard() {
   const { userProfile } = useAuth();
   const [availablePosts, setAvailablePosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState(VIEWS.home);
 
   useEffect(() => {
-    // Listen to all available food posts
-    const q = query(
-      collection(db, 'foodPosts'),
-      where('status', '==', 'available')
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const posts = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
-      // If trust has a location, filter by distance (< 10km) and add distance prop
-      let filteredPosts = posts;
+    const q = query(collection(db, 'foodPosts'), where('status', '==', 'available'));
+    const unsub = onSnapshot(q, snap => {
+      let posts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       if (userProfile?.location) {
-        filteredPosts = posts.map(post => {
-          if (post.location) {
-            const distance = getDistance(
-              userProfile.location.lat, 
-              userProfile.location.lng,
-              post.location.lat,
-              post.location.lng
-            );
-            return { ...post, distance };
+        posts = posts.map(p => {
+          if (p.location) {
+            const dist = getDistance(userProfile.location.lat, userProfile.location.lng, p.location.lat, p.location.lng);
+            return { ...p, distance: dist };
           }
-          return post;
-        }).filter(post => {
-          // Check expiration (3 hours)
-          const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
-          const isExpired = post.createdAt && (Date.now() - post.createdAt.toMillis() > THREE_HOURS_MS);
-          
-          return !isExpired && (post.distance === undefined || post.distance <= 10);
+          return p;
+        }).filter(p => {
+          const expired = p.createdAt && (Date.now() - p.createdAt.toMillis() > 3*60*60*1000);
+          return !expired && (p.distance === undefined || p.distance <= 10);
         });
-        
-        // Sort by closest
-        filteredPosts.sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity));
+        posts.sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity));
       }
-
-      setAvailablePosts(filteredPosts);
+      setAvailablePosts(posts);
       setLoading(false);
     });
-
-    return unsubscribe;
+    return unsub;
   }, [userProfile]);
 
   async function handleAccept(postId) {
     try {
-      const postRef = doc(db, 'foodPosts', postId);
-      await updateDoc(postRef, {
+      await updateDoc(doc(db, 'foodPosts', postId), {
         status: 'accepted',
-        acceptedBy: userProfile.id,
-        acceptedByName: userProfile.name,
+        acceptedBy:      userProfile.id,
+        acceptedByName:  userProfile.name,
         acceptedByPhone: userProfile.phone || '',
-        acceptedByEmail: userProfile.email || ''
+        acceptedByEmail: userProfile.email || '',
       });
-      alert('Food donation accepted! An automated SMS & Email has been immediately dispatched to the donor.');
-    } catch (error) {
-      console.error("Error accepting food:", error);
-      alert('Failed to accept this donation. Please try again.');
-    }
+      alert('✅ Accepted! Donor has been notified.');
+    } catch (e) { console.error(e); alert('Failed. Try again.'); }
   }
 
-  const defaultCenter = userProfile?.location || [20.5937, 78.9629]; // fallback India Center
-  
-  // Create a bounding box for India
-  const indiaBounds = [
-    [6.4626999, 68.1097], // Southwest
-    [35.513327, 97.3953586] // Northeast
-  ];
+  const firstName  = userProfile?.name?.split(' ')[0] || 'there';
+  const initials   = (userProfile?.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const defaultCenter = userProfile?.location || { lat: 20.5937, lng: 78.9629 };
+  const indiaBounds   = [[6.4626999, 68.1097],[35.513327, 97.3953586]];
+
+  if (view === VIEWS.nearby) return (
+    <div style={{ maxWidth:'480px', margin:'0 auto', minHeight:'100vh', background:'#F5F0E8', paddingBottom:'80px' }}>
+      <div className="page-header">
+        <button className="page-back-btn" onClick={() => setView(VIEWS.home)}>
+          <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        </button>
+        <h2>Donations Map</h2>
+      </div>
+      <div style={{ padding:'0 1.25rem' }}>
+        <div style={{ borderRadius:'16px', overflow:'hidden', height:'400px', boxShadow:'0 4px 16px rgba(0,0,0,0.1)' }}>
+          <MapContainer
+            center={[defaultCenter.lat || defaultCenter[0], defaultCenter.lng || defaultCenter[1]]}
+            zoom={userProfile?.location ? 11 : 5}
+            maxBounds={indiaBounds} maxBoundsViscosity={1.0} minZoom={4}
+            style={{ height:'100%', width:'100%' }}>
+            <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            {userProfile?.location && <Marker position={[userProfile.location.lat, userProfile.location.lng]}><Popup><strong>Your Location</strong></Popup></Marker>}
+            {availablePosts.map(p => p.location && (
+              <Marker key={p.id} position={[p.location.lat, p.location.lng]}>
+                <Popup>
+                  <strong>{p.food_name}</strong><br/>Qty: {p.quantity}<br/>
+                  <button onClick={() => handleAccept(p.id)} style={{ marginTop:'8px', padding:'4px 10px', background:'#3A8C3F', color:'#fff', border:'none', borderRadius:'6px', cursor:'pointer' }}>Accept</button>
+                </Popup>
+              </Marker>
+            ))}
+          </MapContainer>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="container" style={{ maxWidth: '1200px' }}>
-      <div className="flex justify-between items-center" style={{ marginBottom: 'var(--spacing-6)' }}>
+    <div style={{ maxWidth:'480px', margin:'0 auto', minHeight:'100vh', background:'#F5F0E8', paddingBottom:'80px' }}>
+      {/* Top bar */}
+      <div className="top-bar">
         <div>
-          <h2 style={{ color: 'var(--secondary-color)' }}>Trust / NGO Dashboard</h2>
-          <p>Available food donations nearby.</p>
+          <div className="greeting">NGO Dashboard</div>
+          <h3>Welcome, {firstName}! 🤝</h3>
+        </div>
+        <div style={{ display:'flex', gap:'10px', alignItems:'center' }}>
+          <button onClick={() => setView(VIEWS.nearby)} style={{ background:'rgba(255,255,255,0.2)', border:'none', borderRadius:'50%', width:'38px', height:'38px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', color:'#fff' }}>
+            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v2m0 16v2"/></svg>
+          </button>
+          <div className="avatar" style={{ width:'38px', height:'38px', fontSize:'0.9rem' }}>{initials}</div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: 'var(--spacing-6)' }}>
-        
-        {/* Left Column: Feed */}
-        <div className="flex-col gap-4">
-          <h3 style={{ marginBottom: 'var(--spacing-4)' }}>Available Food ({availablePosts.length})</h3>
-          
-          {loading ? (
-            <p>Loading nearby donations...</p>
-          ) : availablePosts.length === 0 ? (
-            <div className="card">
-              <div className="card-body" style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
-                <p>No food donations available nearby at the moment.</p>
-                <p style={{ fontSize: '0.875rem', marginTop: 'var(--spacing-2)' }}>We will notify you when new food is posted within 10km.</p>
+      <div style={{ padding:'0 1.25rem' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'0.75rem' }}>
+          <h3 style={{ fontSize:'1rem' }}>Available Food ({availablePosts.length})</h3>
+          <button onClick={() => setView(VIEWS.nearby)} style={{ background:'none', border:'none', color:'#E8622A', fontWeight:700, fontSize:'0.82rem', cursor:'pointer', fontFamily:'Nunito,sans-serif' }}>View Map</button>
+        </div>
+
+        {loading ? <p style={{ color:'#9EAD82' }}>Loading nearby donations…</p>
+        : availablePosts.length === 0 ? (
+          <div className="card" style={{ textAlign:'center', padding:'2rem' }}>
+            <div style={{ fontSize:'2.5rem', marginBottom:'0.5rem' }}>🍽️</div>
+            <p style={{ color:'#9EAD82' }}>No food donations nearby right now.</p>
+            <p style={{ fontSize:'0.8rem', color:'#9EAD82', marginTop:'0.25rem' }}>You'll be notified when food is posted within 10 km.</p>
+          </div>
+        ) : availablePosts.map(post => (
+          <div key={post.id} className="card" style={{ marginBottom:'0.75rem', overflow:'hidden' }}>
+            {post.image_url && <img src={post.image_url} alt={post.food_name} style={{ width:'100%', height:'160px', objectFit:'cover' }}/>}
+            <div className="card-body">
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'0.4rem' }}>
+                <h3 style={{ fontSize:'1rem', margin:0 }}>{post.food_name}</h3>
+                {post.distance !== undefined && (
+                  <span className="badge badge-green">{post.distance.toFixed(1)} km</span>
+                )}
+              </div>
+              <p style={{ fontSize:'0.85rem', marginBottom:'0.4rem' }}>Qty: <strong>{post.quantity}</strong>
+                {post.food_type && <span className={`badge ${post.food_type==='veg'?'badge-green':'badge-orange'}`} style={{ marginLeft:'8px' }}>{post.food_type}</span>}
+              </p>
+              <p style={{ fontSize:'0.8rem', color:'#9EAD82', marginBottom:'0.75rem' }}>
+                Donor: {post.donor_name}
+              </p>
+              <div style={{ display:'flex', gap:'0.5rem' }}>
+                <button onClick={() => handleAccept(post.id)}
+                  style={{ flex:1, padding:'0.6rem', background:'#3A8C3F', color:'#fff', border:'none', borderRadius:'10px', fontWeight:700, fontFamily:'Nunito,sans-serif', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', fontSize:'0.85rem' }}>
+                  <CheckCircle size={15}/> Accept Food
+                </button>
+                {post.location && (
+                  <a href={`https://www.google.com/maps/dir/?api=1&destination=${post.location.lat},${post.location.lng}`}
+                    target="_blank" rel="noreferrer"
+                    style={{ padding:'0.6rem 0.8rem', background:'rgba(232,98,42,0.1)', border:'1.5px solid #E8622A', borderRadius:'10px', color:'#E8622A', display:'flex', alignItems:'center' }}>
+                    <Navigation size={16}/>
+                  </a>
+                )}
+                {post.contact && (
+                  <a href={`tel:${post.contact}`}
+                    style={{ padding:'0.6rem 0.8rem', background:'rgba(58,140,63,0.1)', border:'1.5px solid #3A8C3F', borderRadius:'10px', color:'#3A8C3F', display:'flex', alignItems:'center' }}>
+                    <Phone size={16}/>
+                  </a>
+                )}
               </div>
             </div>
-          ) : (
-            availablePosts.map(post => (
-              <div key={post.id} className="card">
-                {post.image_url && (
-                  <img 
-                    src={post.image_url} 
-                    alt={post.food_name}
-                    style={{ width: '100%', height: '200px', objectFit: 'cover' }}
-                  />
-                )}
-                <div className="card-body">
-                  <div className="flex justify-between items-start" style={{ marginBottom: 'var(--spacing-2)' }}>
-                    <h3 style={{ margin: 0 }}>{post.food_name}</h3>
-                    {post.distance !== undefined && (
-                      <span style={{ 
-                        backgroundColor: 'var(--secondary-light)', 
-                        color: 'var(--secondary-color)',
-                        padding: '4px 8px',
-                        borderRadius: 'var(--radius-full)',
-                        fontSize: '0.75rem',
-                        fontWeight: '600'
-                      }}>
-                        {post.distance.toFixed(1)} km away
-                      </span>
-                    )}
-                  </div>
-                  
-                  <p style={{ fontWeight: '500', marginBottom: 'var(--spacing-2)' }}>Quantity: {post.quantity}</p>
-                  
-                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--spacing-4)' }}>
-                    <p style={{ marginBottom: 'var(--spacing-1)' }}><strong>Donor:</strong> {post.donor_name}</p>
-                    <div className="flex items-center gap-2" style={{ marginBottom: 'var(--spacing-1)' }}>
-                      <a href={`tel:${post.contact}`} style={{ color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }} title="Call/Message Donor">
-                        <Phone size={14} /> <span>{post.contact}</span>
-                      </a>
-                      {post.donor_email && (
-                        <a href={`mailto:${post.donor_email}`} style={{ color: 'var(--text-secondary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'var(--spacing-2)' }} title="Email Donor">
-                          <Mail size={14} /> <span>Email</span>
-                        </a>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <button 
-                      className="btn btn-secondary" 
-                      style={{ flex: 1, gap: 'var(--spacing-2)' }}
-                      onClick={() => handleAccept(post.id)}
-                    >
-                      <CheckCircle size={16} />
-                      Accept Food
-                    </button>
-                    {post.location && (
-                      <a 
-                        href={`https://www.google.com/maps/dir/?api=1&destination=${post.location.lat},${post.location.lng}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn btn-outline"
-                        style={{ padding: '0 var(--spacing-4)' }}
-                        title="Get Directions"
-                      >
-                        <Navigation size={18} />
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* Right Column: Map Overview */}
-        <div>
-          <h3 style={{ marginBottom: 'var(--spacing-4)' }}>Donations Map</h3>
-          <div className="card" style={{ height: '500px', position: 'sticky', top: '100px' }}>
-            <MapContainer 
-              center={Array.isArray(defaultCenter) ? defaultCenter : [defaultCenter.lat, defaultCenter.lng]} 
-              zoom={userProfile?.location ? 11 : 5} 
-              maxBounds={indiaBounds}
-              maxBoundsViscosity={1.0}
-              minZoom={4}
-              style={{ height: '100%', width: '100%', zIndex: 1 }}
-            >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-              
-              {userProfile?.location && (
-                <Marker position={[userProfile.location.lat, userProfile.location.lng]}>
-                  <Popup><strong>Your Location</strong></Popup>
-                </Marker>
-              )}
-
-              {availablePosts.map(post => (
-                post.location && (
-                  <Marker key={post.id} position={[post.location.lat, post.location.lng]}>
-                    <Popup>
-                      <strong>{post.food_name}</strong><br/>
-                      Qty: {post.quantity}<br/>
-                      <button 
-                        onClick={() => handleAccept(post.id)}
-                        className="btn btn-secondary"
-                        style={{ padding: '4px 8px', fontSize: '0.75rem', marginTop: 'var(--spacing-2)' }}
-                      >
-                        Accept
-                      </button>
-                    </Popup>
-                  </Marker>
-                )
-              ))}
-            </MapContainer>
           </div>
-        </div>
-        
+        ))}
       </div>
     </div>
   );

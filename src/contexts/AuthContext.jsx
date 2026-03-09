@@ -1,6 +1,12 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { auth, googleProvider, db } from '../firebase';
-import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import {
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
+} from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const AuthContext = createContext();
@@ -37,6 +43,38 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // Sign in with Email & Password
+  async function loginWithEmail(email, password) {
+    try {
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      const user = result.user;
+
+      const docRef = doc(db, 'users', user.uid);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        setUserProfile(docSnap.data());
+        return { isNewUser: false };
+      } else {
+        return { isNewUser: true, user };
+      }
+    } catch (error) {
+      console.error("Error signing in with email: ", error);
+      throw error;
+    }
+  }
+
+  // Register with Email & Password
+  async function signUpWithEmail(email, password) {
+    try {
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+      return { isNewUser: true, user: result.user };
+    } catch (error) {
+      console.error("Error signing up with email: ", error);
+      throw error;
+    }
+  }
+
   // Complete profile for new users
   async function completeProfile(uid, profileData) {
     try {
@@ -56,7 +94,11 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
+    // Safety timeout — if Firebase never fires, stop loading after 6s
+    const timeout = setTimeout(() => setLoading(false), 6000);
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      clearTimeout(timeout);
       setCurrentUser(user);
       if (user) {
         const docRef = doc(db, 'users', user.uid);
@@ -70,13 +112,15 @@ export function AuthProvider({ children }) {
       setLoading(false);
     });
 
-    return unsubscribe;
+    return () => { clearTimeout(timeout); unsubscribe(); };
   }, []);
 
   const value = {
     currentUser,
     userProfile,
     loginWithGoogle,
+    loginWithEmail,
+    signUpWithEmail,
     logout,
     completeProfile
   };

@@ -1,65 +1,52 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { User, LogOut, Activity } from 'lucide-react';
+import { Home, UtensilsCrossed, MapPin, Bell, User } from 'lucide-react';
 
 export default function Navbar() {
   const { currentUser, userProfile, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   async function handleLogout() {
-    try {
-      await logout();
-      navigate('/login');
-    } catch (error) {
-      console.error('Failed to log out', error);
-    }
+    try { await logout(); navigate('/login'); }
+    catch (e) { console.error(e); }
   }
 
-  return (
-    <nav className="navbar" style={{ position: 'sticky', top: 0, zIndex: 100, backgroundColor: 'rgba(10, 10, 10, 0.8)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
-      <div className="container flex justify-between items-center" style={{ height: '70px' }}>
-        <Link to="/" className="flex items-center gap-2" style={{ textDecoration: 'none' }}>
-           <img src="/logo.png" alt="ShareBite Logo" style={{ height: '40px', objectFit: 'contain' }} />
-        </Link>
-        <div className="flex items-center gap-4">
-        {currentUser && userProfile ? (
-          <>
-            <div style={{ 
-              width: '40px', height: '40px', 
-              borderRadius: '50%', background: 'var(--surface-glass)', 
-              border: '1px solid var(--border-glass)', 
-              boxShadow: 'var(--primary-glow)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              backdropFilter: 'blur(10px)'
-            }}>
-              <User size={18} color="var(--primary-color)" />
-            </div>
+  // Don't show nav on login / complete-profile
+  if (!currentUser || !userProfile) return null;
 
-            <button 
-              onClick={handleLogout}
-              style={{ 
-                width: '40px', height: '40px', 
-                borderRadius: '50%', background: 'var(--surface-glass)', 
-                border: '1px solid var(--border-glass)', 
-                boxShadow: 'var(--primary-glow)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer',
-                color: 'var(--primary-color)',
-                backdropFilter: 'blur(10px)'
-              }}
-              title="Logout"
-            >
-              <LogOut size={18} />
-            </button>
-          </>
-        ) : (
-          <>
-            <div style={{ visibility: 'hidden', width: '40px' }} />
-            <Link to="/login" className="btn btn-primary" style={{ padding: '8px 20px', borderRadius: '50px', fontSize: '0.875rem' }}>Login</Link>
-          </>
-        )}
-        </div>
-      </div>
+  const path = location.pathname;
+
+  const navItems = [
+    { to: '/',        icon: <Home size={22}/>,             label: 'Home' },
+    { to: '/donor',   icon: <UtensilsCrossed size={22}/>,  label: 'Donate' },
+    { to: '/trust',   icon: <MapPin size={22}/>,           label: 'Nearby' },
+    { to: '/profile', icon: <User size={22}/>,             label: 'Profile' },
+  ];
+
+  return (
+    <nav className="bottom-nav">
+      {navItems.map(item => {
+        const active = item.to === '/' ? path === '/' : path.startsWith(item.to);
+        return (
+          <Link
+            key={item.to}
+            to={item.to}
+            className={`bottom-nav-item${active ? ' active' : ''}`}
+          >
+            {item.icon}
+            <span>{item.label}</span>
+          </Link>
+        );
+      })}
+      <button className="bottom-nav-item" onClick={handleLogout}>
+        <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        <span>Logout</span>
+      </button>
     </nav>
   );
 }

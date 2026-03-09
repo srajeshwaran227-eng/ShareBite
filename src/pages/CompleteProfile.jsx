@@ -5,132 +5,115 @@ import { useAuth } from '../contexts/AuthContext';
 export default function CompleteProfile() {
   const { currentUser, completeProfile } = useAuth();
   const navigate = useNavigate();
-  
-  const [role, setRole] = useState('');
-  const [phone, setPhone] = useState('');
+
+  const [role, setRole]     = useState('');
+  const [phone, setPhone]   = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError]   = useState('');
+
+  if (!currentUser) { navigate('/login'); return null; }
 
   async function handleSubmit(e) {
     e.preventDefault();
-    
-    if (!role) {
-      setError('Please select a role.');
-      return;
-    }
-    if (!phone) {
-      setError('Please enter your phone number.');
-      return;
-    }
-
+    if (!role)  { setError('Please select a role.'); return; }
+    if (!phone) { setError('Please enter your phone number.'); return; }
     try {
-      setError('');
-      setLoading(true);
-      
+      setError(''); setLoading(true);
       const profileData = {
-        id: currentUser.uid,
-        name: currentUser.displayName || 'Anonymous User',
+        id:    currentUser.uid,
+        name:  currentUser.displayName || 'Anonymous',
         email: currentUser.email,
-        role: role, // 'donor' or 'trust'
-        phone: phone,
-        // Location would typically go here
+        role, phone,
       };
-
       await completeProfile(currentUser.uid, profileData);
-      
-      if (role === 'donor') {
-        navigate('/donor');
-      } else {
-        navigate('/trust');
-      }
+      navigate(role === 'donor' ? '/donor' : '/trust');
     } catch (err) {
       console.error(err);
-      setError('Failed to create profile.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // If they somehow got here without being logged in with Google first
-  if (!currentUser) {
-    navigate('/login');
-    return null;
+      setError('Failed to create profile. Please try again.');
+    } finally { setLoading(false); }
   }
 
   return (
-    <div className="container flex items-center justify-center p-4" style={{ minHeight: '80vh' }}>
-      <div className="card" style={{ maxWidth: '500px', width: '100%' }}>
-        <div className="card-body">
-          <h2 style={{ marginBottom: 'var(--spacing-2)' }}>Complete Your Profile</h2>
-          <p style={{ marginBottom: 'var(--spacing-6)' }}>Tell us a bit more about yourself to get started.</p>
-          
-          {error && (
-            <div style={{ backgroundColor: 'var(--error-color)', color: 'white', padding: 'var(--spacing-2)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--spacing-4)', width: '100%' }}>
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label className="form-label">I am registering as a:</label>
-              <div className="flex gap-4" style={{ marginTop: 'var(--spacing-2)' }}>
-                <div 
-                  className={`card ${role === 'donor' ? 'selected' : ''}`}
-                  style={{ 
-                    flex: 1, 
-                    cursor: 'pointer', 
-                    border: role === 'donor' ? '2px solid var(--primary-color)' : '1px solid var(--border-color)',
-                    boxShadow: role === 'donor' ? '0 0 0 1px var(--primary-color)' : 'none'
-                  }}
-                  onClick={() => setRole('donor')}
-                >
-                  <div className="card-body" style={{ textAlign: 'center' }}>
-                    <h3 style={{ fontSize: '1.25rem' }}>Donor</h3>
-                    <p style={{ fontSize: '0.875rem', marginTop: 'var(--spacing-1)' }}>I want to donate excess food.</p>
-                  </div>
-                </div>
-
-                <div 
-                  className={`card ${role === 'trust' ? 'selected' : ''}`}
-                  style={{ 
-                    flex: 1, 
-                    cursor: 'pointer', 
-                    border: role === 'trust' ? '2px solid var(--secondary-color)' : '1px solid var(--border-color)',
-                    boxShadow: role === 'trust' ? '0 0 0 1px var(--secondary-color)' : 'none'
-                  }}
-                  onClick={() => setRole('trust')}
-                >
-                  <div className="card-body" style={{ textAlign: 'center' }}>
-                    <h3 style={{ fontSize: '1.25rem' }}>Trust / NGO</h3>
-                    <p style={{ fontSize: '0.875rem', marginTop: 'var(--spacing-1)' }}>I want to accept food donations.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" htmlFor="phone">Phone Number</label>
-              <input 
-                id="phone"
-                type="tel" 
-                className="form-control" 
-                placeholder="e.g. +1 234 567 8900" 
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                required
-              />
-            </div>
-
-            <button 
-              type="submit" 
-              className="btn btn-primary" 
-              style={{ width: '100%', marginTop: 'var(--spacing-4)' }}
-              disabled={loading}
-            >
-              {loading ? 'Saving...' : 'Complete Registration'}
-            </button>
-          </form>
+    <div style={{
+      minHeight:'100vh', background:'linear-gradient(180deg,#F5F0E8 0%,#EDE8DC 100%)',
+      display:'flex', alignItems:'center', justifyContent:'center', padding:'1.5rem'
+    }}>
+      <div style={{
+        background:'#fff', borderRadius:'24px', padding:'2rem',
+        width:'100%', maxWidth:'420px',
+        boxShadow:'0 8px 40px rgba(0,0,0,0.1)', border:'1px solid #E8E0D0'
+      }}>
+        {/* Logo strip */}
+        <div style={{ textAlign:'center', marginBottom:'1.5rem' }}>
+          <div style={{
+            width:'70px', height:'70px',
+            background:'linear-gradient(135deg,#E8622A,#F9A825)',
+            borderRadius:'18px', margin:'0 auto 0.75rem',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            boxShadow:'0 4px 16px rgba(232,98,42,0.3)'
+          }}>
+            <img src="/logo.png" alt="ShareBite" style={{ width:'48px', height:'48px', objectFit:'contain' }}/>
+          </div>
+          <h2 style={{ fontSize:'1.4rem', color:'#2C3E1F' }}>Complete Your Profile</h2>
+          <p style={{ fontSize:'0.85rem', color:'#9EAD82', marginTop:'4px' }}>Tell us who you are to get started</p>
         </div>
+
+        {error && <div style={{ background:'#FEE2E2', color:'#B91C1C', padding:'0.5rem 1rem', borderRadius:'10px', marginBottom:'1rem', fontSize:'0.85rem' }}>{error}</div>}
+
+        <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>
+          {/* Role selection */}
+          <div>
+            <label style={{ display:'block', fontWeight:700, fontSize:'0.85rem', color:'#5A6B3A', marginBottom:'0.5rem' }}>I am registering as a:</label>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.75rem' }}>
+              {[
+                { val:'donor', emoji:'🍱', label:'Donor', sub:'I donate food' },
+                { val:'trust', emoji:'🤝', label:'Trust / NGO', sub:'I accept donations' },
+              ].map(opt => (
+                <button key={opt.val} type="button" onClick={() => setRole(opt.val)}
+                  style={{
+                    padding:'1rem 0.75rem', border:`2px solid ${role===opt.val ? '#E8622A' : '#E8E0D0'}`,
+                    borderRadius:'14px', background:role===opt.val ? 'rgba(232,98,42,0.06)' : '#fff',
+                    cursor:'pointer', transition:'all 0.2s', textAlign:'center', fontFamily:'Nunito,sans-serif'
+                  }}>
+                  <div style={{ fontSize:'1.8rem' }}>{opt.emoji}</div>
+                  <div style={{ fontWeight:800, fontSize:'0.9rem', color:'#2C3E1F', marginTop:'4px' }}>{opt.label}</div>
+                  <div style={{ fontSize:'0.75rem', color:'#9EAD82' }}>{opt.sub}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Phone */}
+          <div>
+            <label style={{ display:'block', fontWeight:700, fontSize:'0.85rem', color:'#5A6B3A', marginBottom:'0.5rem' }}>Phone Number</label>
+            <input
+              type="tel" placeholder="+91 98765 43210"
+              value={phone} onChange={e => setPhone(e.target.value)}
+              required
+              style={{
+                width:'100%', padding:'0.65rem 1rem',
+                background:'#fff', border:'1.5px solid #D9D0C0',
+                borderRadius:'999px', fontFamily:'Nunito,sans-serif',
+                fontSize:'0.95rem', color:'#2C3E1F',
+                outline:'none', transition:'border 0.2s'
+              }}
+              onFocus={e => e.target.style.borderColor='#E8622A'}
+              onBlur={e => e.target.style.borderColor='#D9D0C0'}
+            />
+          </div>
+
+          {/* Submit */}
+          <button type="submit" disabled={loading}
+            style={{
+              padding:'0.8rem', background:loading ? '#D9D0C0' : '#E8622A',
+              color:'#fff', border:'none', borderRadius:'12px',
+              fontWeight:800, fontSize:'1rem', cursor:loading?'not-allowed':'pointer',
+              fontFamily:'Nunito,sans-serif', transition:'all 0.2s',
+              boxShadow:loading?'none':'0 4px 14px rgba(232,98,42,0.4)'
+            }}>
+            {loading ? 'Saving…' : 'Complete Registration'}
+          </button>
+        </form>
       </div>
     </div>
   );
