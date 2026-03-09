@@ -1,0 +1,32 @@
+# ShareBite Development Tasks
+
+- [x] Project Setup
+  - [x] Initialize Vite React project in workspace
+  - [x] Configure Vanilla CSS design system
+  - [x] Configure PWA manifest and service worker
+  - [x] Initialize Firebase config (Auth, Firestore, Storage)
+- [x] Authentication System
+  - [x] Login/Register UI
+  - [x] Role Selection (Donor/Trust)
+  - [x] Firebase Auth integration (Google Sign-In)
+- [x] Core UI Components
+  - [x] Navigation Bar
+  - [x] Layout Container
+  - [x] Card Component
+  - [x] Forms and Buttons
+- [x] Donor Features
+  - [x] Donor Dashboard
+  - [x] Food Upload Form (Image, Location, Details)
+  - [x] Geolocation API integration
+  - [x] Google Maps view for nearby NGOs
+  - [x] Post tracking UI
+- [x] Trust Features
+  - [x] Trust Dashboard
+  - [x] Feed of available food posts with donor contact details
+  - [x] Google Maps integration
+  - [x] Accept/Ignore actions
+- [x] Additional Features & Polish
+  - [x] Notifications logic (mocked)
+  - [x] 3-hour expiration logic
+  - [x] Admin panel
+  - [x] Responsive design check
